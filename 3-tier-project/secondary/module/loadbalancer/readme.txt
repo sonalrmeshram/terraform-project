@@ -1,78 +1,32 @@
-resource "aws_lb_target_group" "frontend" {
-  tags = {
-    Name = "front"
-  }
-  name = "front"
-  protocol = "HTTP"
-  port = "80"
+A target group is where the ALB sends traffic.
+Here, any request to the frontend ALB is forwarded to EC2 instances registered in this group.
+health_check ensures that only healthy instances (returning HTTP 200 on /) receive traffic.
 
-  vpc_id = var.vpc_id
-    health_check {
-    protocol = "HTTP"
-    path     = "/"       # simple root check
-    matcher  = "200"
-  }
-}
+Creates an Application Load Balancer (ALB) for the frontend.
+internal = false → means it’s public-facing (accessible from the internet).
+Placed in public subnets.
+Attached to a security group for firewall rules.
 
-resource "aws_lb" "frontend" {
-  load_balancer_type = "application"
-  name = "front"
-  internal = false
-  ip_address_type = "ipv4"
-  subnets         = var.public_subnet_ids
-  security_groups = [var.security_group_id]
-  tags = {
-    Name = "front"
-  }
-  
-}
- 
-resource "aws_lb_listener" "frontend" {
-  protocol = "HTTP"
-  port = "80"
-  load_balancer_arn = aws_lb.frontend.arn
-  default_action {
-    target_group_arn = aws_lb_target_group.frontend.arn
-    type = "forward"
-  }
-  depends_on =[aws_lb_target_group.frontend ]
+A listener listens for incoming traffic on a port.
+Here:
+Listens on HTTP port 80.
+Forwards all requests to the frontend target group.
 
-}
-resource "aws_lb_target_group" "backend" {
-  tags = {
-    Name = "back"
-  }
-  name = "back"
-  protocol = "HTTP"
-  port = "80"
-  vpc_id = var.vpc_id
-    health_check {
-    protocol = "HTTP"
-    path     = "/"       # simple root check
-    matcher  = "200"
-  }
+Same concept as frontend, but for backend EC2 instances.
+Used by the backend ALB to forward traffic.
 
-}
+Creates another ALB for backend services.
+Also public-facing (internal = false), which may not be ideal for backend — usually backend ALBs should be internal (internal = true) so only frontend services can access them.
 
-resource "aws_lb" "backend" {
-  load_balancer_type = "application"
-  name = "back"
-  internal = false
-  ip_address_type = "ipv4"
-  subnets = var.public_subnet_ids
-  security_groups    = [var.security_group_id]
+Listens on port 80.
+Forwards traffic to the backend target group.
 
-   depends_on = [aws_lb_target_group.backend]
-}
+Frontend ALB:
 
-resource "aws_lb_listener" "backend" {
-  protocol = "HTTP"
-  port = "80"
-  load_balancer_arn = aws_lb.backend.arn
+Public-facing, listens on port 80.
+Forwards requests to frontend instances (via frontend target group).
 
-  default_action {
-    target_group_arn = aws_lb_target_group.backend.arn
-    type = "forward"
-  }
-  depends_on = [aws_lb_target_group.backend]
-}
+Backend ALB:
+
+Also public-facing (but best practice is to make it internal).
+Forwards requests to backend instances (via backend target group).
